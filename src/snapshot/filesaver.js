@@ -43,11 +43,16 @@ var fileSaver = function(url, name) {
         }
 
         if(canUseSaveLink) {
-            saveLink.href = url;
+            // TODO polish up!!
+            var encoded = url.split(/^data:image\/svg\+xml,/)[1];
+            var svg = decodeURIComponent(encoded);
+            var objectUrl = URL.createObjectURL(new Blob([svg]));
+            saveLink.href = objectUrl;
             saveLink.download = name;
             document.body.appendChild(saveLink);
             saveLink.click();
             document.body.removeChild(saveLink);
+            URL.revokeObjectURL(objectUrl);
             resolve(name);
         }
 
