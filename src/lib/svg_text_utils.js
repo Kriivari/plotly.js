@@ -296,6 +296,8 @@ var STYLEMATCH = /(^|[\s"'])style\s*=\s*("([^"]*);?"|'([^']*);?')/i;
 var HREFMATCH = /(^|[\s"'])href\s*=\s*("([^"]*)"|'([^']*)')/i;
 var TARGETMATCH = /(^|[\s"'])target\s*=\s*("([^"\s]*)"|'([^'\s]*)')/i;
 var POPUPMATCH = /(^|[\s"'])popup\s*=\s*("([\w=,]*)"|'([\w=,]*)')/i;
+var XMATCH = /(^|[\s"'])x\s*=\s*("([^"]*);?"|'([^']*);?')/i;
+var DXMATCH = /(^|[\s"'])dx\s*=\s*("([^"]*);?"|'([^']*);?')/i;
 
 // dedicated matcher for these quoted regexes, that can return their results
 // in two different places
@@ -512,7 +514,9 @@ function buildSVGText(containerNode, str) {
         } else nodeType = 'tspan';
 
         if(nodeSpec.style) nodeAttrs.style = nodeSpec.style;
-
+	if(nodeSpec.dx) nodeAttrs.dx = nodeSpec.dx;
+        if(nodeSpec.x) nodeAttrs.x = nodeSpec.x;
+	
         var newNode = document.createElementNS(xmlnsNamespaces.svg, nodeType);
 
         if(type === 'sup' || type === 'sub') {
@@ -595,6 +599,10 @@ function buildSVGText(containerNode, str) {
                 } else if(tagStyle) css = tagStyle;
 
                 if(css) nodeSpec.style = css;
+                var dx = getQuotedMatch(extra, DXMATCH);
+                if(dx) nodeSpec.dx = dx;
+                var xx = getQuotedMatch(extra, XMATCH);
+                if(xx) nodeSpec.x = xx;
 
                 if(tagType === 'a') {
                     hasLink = true;
@@ -648,6 +656,30 @@ exports.positionText = function positionText(s, x, y) {
 
         if(this.nodeName === 'text') {
             text.selectAll('tspan.line').attr({x: thisX, y: thisY});
+        }
+    });
+};
+
+exports.positionBackground = function positionBackground(s, x, y) {
+    return s.each(function() {
+        var rect = d3.select(this);
+
+        function setOrGet(attr, val) {
+            if(val === undefined) {
+                val = rect.attr(attr);
+                if(val === null) {
+                    rect.attr(attr, 0);
+                    val = 0;
+                }
+            } else rect.attr(attr, val);
+            return val;
+        }
+
+        var thisX = setOrGet('x', x);
+        var thisY = setOrGet('y', y);
+
+        if(this.nodeName === 'rect') {
+            rect.attr({x: thisX, y: thisY});
         }
     });
 };

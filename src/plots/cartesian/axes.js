@@ -2225,6 +2225,9 @@ axes.makeLabelFns = function(ax, shift, angle) {
             if(isNumeric(a) && Math.abs(a) === 90) {
                 return 'middle';
             }
+            if(ax.align) {
+                return ax.align;
+            }
             return ax.side === 'right' ? 'start' : 'end';
         };
         out.heightFn = function(d, a, h) {
@@ -2423,14 +2426,46 @@ axes.drawLabels = function(gd, ax, opts) {
     var tickAngle = opts.secondary ? 0 : ax.tickangle;
     var lastAngle = (ax._tickAngles || {})[cls];
 
+    if( gd.layout && gd.layout[axLetter + 'axis'] && gd.layout[axLetter + 'axis'].axisAlign ) {
+        ax.align = gd.layout[axLetter + 'axis'].axisAlign;
+    }
+    var axXShift = 0;
+    if( gd.layout && gd.layout[axLetter + 'axis'] && gd.layout[axLetter + 'axis'].dx ) {
+        axXShift = parseFloat(gd.layout[axLetter + 'axis'].dx);
+    }
+    
     var tickLabels = opts.layer.selectAll('g.' + cls)
         .data(ax.showticklabels ? vals : [], tickDataFn);
 
     var labelsReady = [];
 
-    tickLabels.enter().append('g')
-        .classed(cls, 1)
-        .append('text')
+    var counter = 0;
+    var leftEdge = (gd && gd.layout && gd.layout.margin && gd.layout.margin.l ? gd.layout.margin.l : 0);
+    var striped = (gd && gd.layout && gd.layout.yaxis && gd.layout.yaxis.striped ?gd.layout.yaxis.striped : false);
+
+    var draw = tickLabels.enter().append('g')
+        .classed(cls, 1);
+    var height = gd.layout[axLetter + 'axis'].stripeHeight;
+    if( ! height ) {
+        height = 20;
+    }
+    var offset = gd.layout[axLetter + 'axis'].stripeOffset;
+    if( ! offset ) {
+        offset = 0;
+    }
+    if( axLetter === 'y' && striped ) {
+        draw.append('rect')
+            .attr('fill', striped)
+            .each(function(d) {
+                var thisBackground = d3.select(this);
+                if( counter++ % 2 === 0 ) {
+                    thisBackground.attr('height', LINE_SPACING * height).attr('width', leftEdge).call(svgTextUtils.positionBackground, 0, offset);
+                }
+            });
+        positionBackgrounds(draw, tickAngle);
+    }
+    
+    draw.append('text')
             // only so tex has predictable alignment that we can
             // alter later
             .attr('text-anchor', 'middle')
@@ -2501,6 +2536,29 @@ axes.drawLabels = function(gd, ax, opts) {
         });
     }
 
+    function positionBackgrounds(s, angle) {
+        s.each(function(d) {
+            var thisLabel = d3.select(this);
+            var transform = opts.transFn.call(thisLabel.node(), d) +
+                ((isNumeric(angle) && +angle !== 0) ?
+                (' rotate(' + angle + ',' + labelFns.xFn(d) + ',' +
+                    (labelFns.yFn(d) - d.fontSize / 2) + ')') :
+                 '');
+
+            // how much to shift a multi-line label to center it vertically.
+            var nLines = svgTextUtils.lineCount(thisLabel);
+            var lineHeight = LINE_SPACING * d.fontSize;
+            var anchorHeight = labelFns.heightFn(d, isNumeric(angle) ? +angle : 0, (nLines - 1) * lineHeight) - lineHeight / 2;
+
+            if(anchorHeight) {
+                transform += ' translate(0, ' + anchorHeight + ')';
+            }
+            thisLabel.select('rect').attr({
+                transform: transform
+                });
+            });
+    }
+    
     // make sure all labels are correctly positioned at their base angle
     // the positionLabels call above is only for newly drawn labels.
     // do this without waiting, using the last calculated angle to
